@@ -15,7 +15,7 @@ macro_rules! info {
 macro_rules! success {
   ($($arg:tt)*) => ({
     use colored::Colorize;
-    println!("[{}] {}\n", "✓".green().bold(), std::format_args!($($arg)*));
+    println!("\t[{}] {}", "✓".green().bold(), std::format_args!($($arg)*));
   })
 }
 
@@ -23,7 +23,7 @@ macro_rules! success {
 macro_rules! error {
   ($($arg:tt)*) => ({
     use colored::Colorize;
-    println!("[{}] {}\n", "!".red().bold(), std::format_args!($($arg)*));
+    println!("\t[{}] {}", "!".red().bold(), std::format_args!($($arg)*));
     std::process::exit(1);
   })
 }
