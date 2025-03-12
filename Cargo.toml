@@ -1,0 +1,26 @@
+[package]
+name = "gvm"
+license = "UNLICENSED"
+version = "2025.3.12"
+edition = "2021"
+description = "Golang Version Manager for Linux"
+
+[[bin]]
+name = "gvm"
+
+[dependencies]
+bytes = { version = "1.10.0", features = ["serde"] }
+clap = { version = "4.5.29", features = ["derive", "color"] }
+clap_complete = "4.5.44"
+colored = "3.0.0"
+flate2 = "1.0.35"
+regex = "1.11.1"
+reqwest = { version = "0.12.12", default-features = false, features = [
+  "json",
+  "native-tls",
+  "blocking",
+] }
+serde = { version = "1.0.217", features = ["derive"] }
+serde_json = "1.0.138"
+tar = "0.4.43"
+tokio = { version = "1.43.0", features = ["full"] }
