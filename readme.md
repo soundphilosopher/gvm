@@ -12,21 +12,47 @@
 ## Install
 
 ```shell
-# build and install GVM
-$ cargo install --path .
-
-# init GVM
-$ gvm init
-
-# get latest releases
-$ gvm update
+$ ./install-nix.sh
 ```
 
 ## List available releases
 
 ```shell
+# all versions
 $ gvm list-remote
 $ gvm ls-remote
+
+# only stable versions
+$ gvm list-remote --stable
+$ gvm ls-remote --stable
+
+# list with specific version
+$ gvm list-remote 1.24.0
+$ gvm ls-remote 1.24.0
+
+# list with wildcard version
+$ gvm list-remote 1.24.*
+$ gvm ls-remote 1.24.*
+```
+
+## List installed versions
+
+```shell
+# all versions
+$ gvm list
+$ gvm ls
+
+# only stable versions
+$ gvm list --stable
+$ gvm ls --stable
+
+# list with specific version
+$ gvm list 1.24.0
+$ gvm ls 1.24.0
+
+# list with wildcard version
+$ gvm list 1.24.*
+$ gvm ls 1.24.*
 ```
 
 ## Install Go
