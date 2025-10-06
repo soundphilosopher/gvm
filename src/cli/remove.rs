@@ -1,6 +1,6 @@
 use std::fs;
 
-use crate::{error, info, success, util, Res};
+use crate::{error, info, success, utils, Res};
 
 /// Removes a specified version of the software from the system.
 ///
@@ -19,10 +19,10 @@ use crate::{error, info, success, util, Res};
 /// * `Res<()>`: A Result type. Returns Ok(()) if the removal is successful,
 ///   or an error if any step of the removal process fails.
 pub async fn remove(version: String) -> Res<()> {
-    let real_version = util::get_real_version(version);
+    let real_version = utils::get_real_version(version);
 
     info!("Checking if version {} is installed...", real_version);
-    let installed_versions: Vec<String> = util::list_installed_versions()?;
+    let installed_versions: Vec<String> = utils::list_installed_versions().await?;
     if !installed_versions.contains(&real_version) {
         error!(
             "Version {} is not installed. Please install it first.",
@@ -31,7 +31,7 @@ pub async fn remove(version: String) -> Res<()> {
     }
 
     info!("Checking if version {} is active...", real_version);
-    if util::is_version_active(&real_version) {
+    if utils::is_version_active(&real_version).await {
         error!(
             "Version {} is currently active. Please deactivate it first.",
             real_version
@@ -39,9 +39,9 @@ pub async fn remove(version: String) -> Res<()> {
     }
 
     info!("Removing default alias for version '{}'...", real_version);
-    let alias_dir = util::get_alias_file_path();
-    let alias_path = format!("{}/{}", alias_dir, "default");
-    match util::remove_existing_symlink(alias_path) {
+    let alias_dir = utils::get_alias_file_path();
+    let alias_path = alias_dir.join("default");
+    match utils::remove_existing_symlink(alias_path).await {
         Ok(_) => success!("Default alias removed for version {}.", real_version),
         Err(err) => error!(
             "Failed to remove default alias for version {}: {}",
@@ -50,8 +50,8 @@ pub async fn remove(version: String) -> Res<()> {
     }
 
     info!("Removing version {}...", real_version);
-    let version_dir = util::get_version_file_path();
-    let version_path = format!("{}/{}", version_dir, real_version);
+    let version_dir = utils::get_version_file_path();
+    let version_path = version_dir.join(&real_version);
     match fs::remove_dir_all(version_path) {
         Ok(_) => success!("Version {} removed.", real_version),
         Err(err) => error!("Failed to remove version {}: {}", real_version, err),

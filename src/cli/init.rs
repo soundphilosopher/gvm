@@ -1,8 +1,8 @@
-use std::{env, fs, io::ErrorKind, path::Path};
+use std::{env, io};
 
 use regex::Regex;
 
-use crate::{error, info, success, util, Res};
+use crate::{error, info, success, utils, Res};
 
 /// Returns the content of the initialization script for GVM (Go Version Manager).
 ///
@@ -24,12 +24,8 @@ fn get_init_script_content(gvm_root: &str) -> String {
         r#"
 # >>> gvm initialize >>>
 export GVM_ROOT="{}"
-if [ -s "$HOME/.cargo/bin/gvm" ] && [ ! -f "$GVM_ROOT/bash_completion" ]; then
-        gvm completions bash > "$GVM_ROOT/bash_completion"
-fi
-
-if [ -f "$GVM_ROOT/bash_completion" ]; then
-        source "$GVM_ROOT/bash_completion"
+if [ -s "$HOME/.cargo/bin/gvm" ] && [ ! -f "$HOME/.bash_completions/gvm" ]; then
+        gvm completions bash > "$HOME/.bash_completions/gvm"
 fi
 
 if [ -s "$GVM_ROOT/environment/go.env" ]; then
@@ -82,62 +78,56 @@ fi
 /// Returns `Ok(())` if all directories are created successfully or already exist.
 /// Returns an error if there's a problem creating any of the directories that
 /// doesn't fall into the "already exists" category.
-fn create_base_directories() -> Res<()> {
-    let alias_dir = util::get_alias_file_path();
-    let alias_path = Path::new(&alias_dir);
-    match fs::create_dir_all(&alias_path) {
+async fn create_base_directories() -> Res<()> {
+    let alias_path = utils::get_alias_file_path();
+    match async_fs::create_dir_all(&alias_path).await {
         Ok(_) => success!("Alias directory created successfully."),
-        Err(ref e) if e.kind() == ErrorKind::AlreadyExists => {
+        Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => {
             info!("Alias directory already exists.")
         }
         Err(e) => error!("Error creating alias directory: {}", e),
     }
 
-    let archive_dir = util::get_archive_file_path();
-    let archive_path = Path::new(&archive_dir);
-    match fs::create_dir_all(&archive_path) {
+    let archive_path = utils::get_archive_file_path();
+    match async_fs::create_dir_all(&archive_path).await {
         Ok(_) => success!("Archive directory created successfully."),
-        Err(ref e) if e.kind() == ErrorKind::AlreadyExists => {
+        Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => {
             info!("Archive directory already exists.")
         }
         Err(e) => error!("Error creating archive directory: {}", e),
     }
 
-    let cache_dir = util::get_cache_dir();
-    let cache_path = Path::new(&cache_dir);
-    match fs::create_dir_all(&cache_path) {
+    let cache_dir = utils::get_cache_dir();
+    match async_fs::create_dir_all(&cache_dir).await {
         Ok(_) => success!("Cache directory created successfully."),
-        Err(ref e) if e.kind() == ErrorKind::AlreadyExists => {
+        Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => {
             info!("Cache directory already exists.")
         }
         Err(e) => error!("Error creating cache directory: {}", e),
     }
 
-    let environment_dir = util::get_environment_file_path();
-    let environment_path = Path::new(&environment_dir);
-    match fs::create_dir_all(&environment_path) {
+    let environment_path = utils::get_environment_file_path();
+    match async_fs::create_dir_all(&environment_path).await {
         Ok(_) => success!("Environment directory created successfully."),
-        Err(ref e) if e.kind() == ErrorKind::AlreadyExists => {
+        Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => {
             info!("Environment directory already exists.")
         }
         Err(e) => error!("Error creating environment directory: {}", e),
     }
 
-    let package_dir = util::get_package_file_path();
-    let package_path = Path::new(&package_dir);
-    match fs::create_dir_all(&package_path) {
+    let package_path = utils::get_package_file_path();
+    match async_fs::create_dir_all(&package_path).await {
         Ok(_) => success!("Package directory created successfully."),
-        Err(ref e) if e.kind() == ErrorKind::AlreadyExists => {
+        Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => {
             info!("Package directory already exists.")
         }
         Err(e) => error!("Error creating package directory: {}", e),
     }
 
-    let version_dir = util::get_version_file_path();
-    let version_path = Path::new(&version_dir);
-    match fs::create_dir_all(&version_path) {
+    let version_path = utils::get_version_file_path();
+    match async_fs::create_dir_all(&version_path).await {
         Ok(_) => success!("Version directory created successfully."),
-        Err(ref e) if e.kind() == ErrorKind::AlreadyExists => {
+        Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => {
             info!("Version directory already exists.")
         }
         Err(e) => error!("Error creating version directory: {}", e),
@@ -170,7 +160,7 @@ pub async fn init() -> Res<()> {
     }
 
     info!("Creating GVM path structure ...");
-    match create_base_directories() {
+    match create_base_directories().await {
         Ok(_) => success!("GVM path structure created successfully."),
         Err(e) => {
             error!("Error creating GVM path structure: {}", e);
@@ -178,10 +168,10 @@ pub async fn init() -> Res<()> {
     }
 
     info!("Create init script for bash shell ...");
-    let gvm_base_dir = util::get_gvm_base_file_path();
-    let gvm_init_file_path = Path::new(&gvm_base_dir).join("init-shell");
-    let init_script_content = get_init_script_content(&util::get_gvm_base_file_path());
-    match fs::write(&gvm_init_file_path, init_script_content) {
+    let gvm_base_dir = utils::get_gvm_base_file_path();
+    let gvm_init_file_path = gvm_base_dir.join("init-shell");
+    let init_script_content = get_init_script_content(&gvm_base_dir.to_string_lossy());
+    match async_fs::write(&gvm_init_file_path, init_script_content).await {
         Ok(_) => success!("Init script created successfully."),
         Err(e) => {
             error!("Error creating init script: {}", e);
@@ -192,8 +182,8 @@ pub async fn init() -> Res<()> {
     let start_marker = "# >>> gvm initialize >>>";
     let end_marker = "# <<< gvm initialize <<<";
 
-    let shell_config_path = util::get_shell_config_file_path();
-    let shell_config_content = fs::read_to_string(&shell_config_path)?;
+    let shell_config_path = utils::get_shell_config_file_path()?;
+    let shell_config_content = async_fs::read_to_string(&shell_config_path).await?;
 
     // Build a regex that matches from the start marker to the end marker (non-greedy).
     let pattern = format!(
@@ -208,13 +198,13 @@ pub async fn init() -> Res<()> {
     } else {
         info!("Initializing Go environment...");
         let mut new_shell_config_content = shell_config_content;
-        let content = fs::read_to_string(&gvm_init_file_path)?;
+        let content = async_fs::read_to_string(&gvm_init_file_path).await?;
         if !new_shell_config_content.ends_with('\n') {
             new_shell_config_content.push('\n');
         }
         new_shell_config_content.push_str(&content);
 
-        match fs::write(&shell_config_path, new_shell_config_content) {
+        match async_fs::write(&shell_config_path, new_shell_config_content).await {
             Ok(_) => success!("Go environment initialized successfully."),
             Err(e) => {
                 error!("Error initializing Go environment: {}", e);

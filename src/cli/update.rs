@@ -1,8 +1,11 @@
 use reqwest;
 use serde::{Deserialize, Serialize};
-use std::{error::Error, fs, path::Path};
+use std::{
+    error::Error,
+    path::{Path, PathBuf},
+};
 
-use crate::{info, success, util, Res};
+use crate::{info, success, utils, Res};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Release {
@@ -76,7 +79,7 @@ async fn create_release_cache<P: AsRef<Path>>(cache_file: P) -> Res<()> {
         for file in release.files {
             if file.os == "linux" && file.arch == "amd64" && file.filename.ends_with("tar.gz") {
                 let url = format!("https://go.dev/dl/{}", file.filename);
-                filtered_releases.push(util::FilteredRelease {
+                filtered_releases.push(utils::FilteredRelease {
                     version: release.version.clone(),
                     url,
                 });
@@ -90,11 +93,11 @@ async fn create_release_cache<P: AsRef<Path>>(cache_file: P) -> Res<()> {
     // Ensure that the parent directories exist.
     info!("Ensure cache directory exists ...");
     if let Some(parent) = cache_file.as_ref().parent() {
-        fs::create_dir_all(parent)?;
+        async_fs::create_dir_all(parent).await?;
     }
 
     // Write the filtered data to the cache file.
-    fs::write(cache_file, data)?;
+    async_fs::write(&cache_file, &data).await?;
     success!("Cached {} releases.", filtered_releases.len());
     Ok(())
 }
@@ -117,8 +120,8 @@ async fn create_release_cache<P: AsRef<Path>>(cache_file: P) -> Res<()> {
 /// - Retrieving the cache directory fails
 /// - Creating the release cache fails
 pub async fn update() -> Res<()> {
-    let cache_dir: String = util::get_cache_dir();
-    let cache_file = format!("{}/releases.json", cache_dir);
+    let mut cache_dir: PathBuf = utils::get_cache_dir();
+    cache_dir.push("release.json");
 
-    Ok(create_release_cache(cache_file).await?)
+    Ok(create_release_cache(cache_dir).await?)
 }

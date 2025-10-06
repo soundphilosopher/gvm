@@ -1,12 +1,12 @@
+use futures_lite::stream::StreamExt;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
     env,
     error::Error,
-    fs::{self, File},
-    io::{self, ErrorKind, Write},
-    path::Path,
+    io,
+    path::{Path, PathBuf},
 };
 
 #[cfg(unix)]
@@ -46,7 +46,7 @@ pub fn get_real_version(version: String) -> String {
         format!("go{}", version)
     };
 
-    return real_version;
+    real_version
 }
 
 /// Parses a version string into its numeric base parts and an optional suffix.
@@ -104,8 +104,8 @@ pub fn cmp_versions(a: &str, b: &str) -> Ordering {
 /// - `Some(String)` containing the path to the user's home directory if the
 ///   "HOME" environment variable is set and valid.
 /// - `None` if the "HOME" environment variable is not set or cannot be read.
-fn get_home_dir() -> Option<String> {
-    env::var("HOME").ok()
+fn get_home_dir() -> PathBuf {
+    dirs::home_dir().unwrap_or_else(|| error!("Cannot access HOME dir"))
 }
 
 /// Retrieves the path of the current shell.
@@ -138,23 +138,21 @@ fn get_shell() -> Option<String> {
 /// - If the shell is neither bash nor zsh.
 /// - If the SHELL environment variable cannot be retrieved.
 /// - If the home directory cannot be determined for the identified shell.
-pub fn get_shell_config_file_path() -> String {
+pub fn get_shell_config_file_path() -> Result<PathBuf, String> {
     match get_shell() {
         Some(shell_path) => {
             if shell_path.ends_with("/bash") {
-                return get_home_dir()
-                    .map(|home| format!("{}/.bashrc", home))
-                    .unwrap_or_else(|| error!("Cannot find .bashrc"));
+                let home = get_home_dir();
+                return Ok(home.join(".bashrc"));
             } else if shell_path.ends_with("/zsh") {
-                return get_home_dir()
-                    .map(|home| format!("{}/.zshrc", home))
-                    .unwrap_or_else(|| error!("Cannot find .zshrc"));
+                let home = get_home_dir();
+                return Ok(home.join(".zshrc"));
             } else {
-                error!("Unsupported shell: {}", shell_path);
+                return Err(format!("Unsupported shell: {}", shell_path));
             }
         }
         None => {
-            error!("Failed to retrieve SHELL environment variable");
+            return Err("Failed to retrieve SHELL environment variable".to_string());
         }
     }
 }
@@ -171,10 +169,9 @@ pub fn get_shell_config_file_path() -> String {
 /// A `String` representing the full path to the GVM base directory:
 /// - `~/.gvm` if the home directory is available
 /// - `/tmp/gvm` as a fallback if the home directory cannot be determined
-pub fn get_gvm_base_file_path() -> String {
-    get_home_dir()
-        .map(|home| format!("{}/.gvm", home))
-        .unwrap_or_else(|| "/tmp/gvm".to_string())
+pub fn get_gvm_base_file_path() -> PathBuf {
+    let home = get_home_dir();
+    home.join(".gvm")
 }
 
 /// Returns the path to the cache directory for the GVM (Go Version Manager) system.
@@ -189,8 +186,9 @@ pub fn get_gvm_base_file_path() -> String {
 /// A `String` representing the full path to the cache directory:
 /// - `~/.gvm/cache` if the home directory is available
 /// - `/tmp/gvm/cache` as a fallback if the home directory cannot be determined
-pub fn get_cache_dir() -> String {
-    return format!("{}/cache", get_gvm_base_file_path());
+pub fn get_cache_dir() -> PathBuf {
+    let gvm_path = get_gvm_base_file_path();
+    gvm_path.join("cache")
 }
 
 /// Returns the file path for the environment configuration used by GVM (Go Version Manager).
@@ -204,8 +202,9 @@ pub fn get_cache_dir() -> String {
 /// A `String` representing the full path to the environment file:
 /// - `~/.gvm/environment` if the home directory is available
 /// - `/tmp/gvm/environment` as a fallback if the home directory cannot be determined
-pub fn get_environment_file_path() -> String {
-    return format!("{}/environment", get_gvm_base_file_path());
+pub fn get_environment_file_path() -> PathBuf {
+    let gvm_path = get_gvm_base_file_path();
+    gvm_path.join("environment")
 }
 
 /// Returns the file path for the version configuration.
@@ -219,8 +218,9 @@ pub fn get_environment_file_path() -> String {
 /// A `String` representing the full path to the version file:
 /// - `~/.gvm/version` if the home directory is available
 /// - `/tmp/gvm/version` as a fallback if the home directory cannot be determined
-pub fn get_version_file_path() -> String {
-    return format!("{}/version", get_gvm_base_file_path());
+pub fn get_version_file_path() -> PathBuf {
+    let gvm_path = get_gvm_base_file_path();
+    gvm_path.join("version")
 }
 
 /// Returns the file path for the package configuration.
@@ -234,8 +234,9 @@ pub fn get_version_file_path() -> String {
 /// A `String` representing the full path to the package file:
 /// - `~/.gvm/package` if the home directory is available
 /// - `/tmp/gvm/package` as a fallback if the home directory cannot be determined
-pub fn get_package_file_path() -> String {
-    return format!("{}/package", get_gvm_base_file_path());
+pub fn get_package_file_path() -> PathBuf {
+    let gvm_path = get_gvm_base_file_path();
+    gvm_path.join("package")
 }
 
 /// Returns the file path for the archive configuration.
@@ -249,8 +250,9 @@ pub fn get_package_file_path() -> String {
 /// A `String` representing the full path to the archive file:
 /// - `~/.gvm/archive` if the home directory is available
 /// - `/tmp/gvm/archive` as a fallback if the home directory cannot be determined
-pub fn get_archive_file_path() -> String {
-    return format!("{}/archive", get_gvm_base_file_path());
+pub fn get_archive_file_path() -> PathBuf {
+    let gvm_path = get_gvm_base_file_path();
+    gvm_path.join("archive")
 }
 
 /// Returns the file path for the alias configuration.
@@ -264,8 +266,9 @@ pub fn get_archive_file_path() -> String {
 /// A `String` representing the full path to the alias file:
 /// - `~/.gvm/alias` if the home directory is available
 /// - `/tmp/gvm/alias` as a fallback if the home directory cannot be determined
-pub fn get_alias_file_path() -> String {
-    return format!("{}/alias", get_gvm_base_file_path());
+pub fn get_alias_file_path() -> PathBuf {
+    let gvm_path = get_gvm_base_file_path();
+    gvm_path.join("alias")
 }
 
 /// Lists all installed Go versions managed by GVM.
@@ -287,14 +290,14 @@ pub fn get_alias_file_path() -> String {
 /// - The version directory path cannot be retrieved or accessed.
 /// - There are issues reading the directory entries.
 /// - The directory entry names cannot be converted to strings.
-pub fn list_installed_versions() -> Result<Vec<String>, Box<dyn Error + Send + Sync>> {
-    let version_dir = get_version_file_path();
-    let version_path = Path::new(&version_dir);
+pub async fn list_installed_versions() -> Result<Vec<String>, Box<dyn Error + Send + Sync>> {
+    let version_path = get_version_file_path();
     let mut versions = Vec::new();
 
-    for entry in fs::read_dir(version_path)? {
-        let entry = entry?;
-        if entry.file_type()?.is_dir() {
+    let mut entries = async_fs::read_dir(&version_path).await?;
+
+    while let Some(entry) = entries.try_next().await? {
+        if entry.file_type().await?.is_dir() {
             let version_name = entry.file_name().into_string().unwrap_or_default();
             versions.push(version_name);
         }
@@ -322,14 +325,14 @@ pub fn list_installed_versions() -> Result<Vec<String>, Box<dyn Error + Send + S
 /// - The alias directory path cannot be retrieved or accessed.
 /// - There are issues reading the directory entries.
 /// - The directory entry names cannot be converted to strings.
-pub fn list_aliases() -> Result<Vec<String>, Box<dyn Error + Send + Sync>> {
-    let alias_file = get_alias_file_path();
-    let alias_path = Path::new(&alias_file);
+pub async fn list_aliases() -> Result<Vec<String>, Box<dyn Error + Send + Sync>> {
+    let alias_path = get_alias_file_path();
     let mut aliases = Vec::new();
 
-    for entry in fs::read_dir(alias_path)? {
-        let entry = entry?;
-        let alias_name = entry.file_name().into_string().unwrap_or_default();
+    let mut entries = async_fs::read_dir(&alias_path).await?;
+
+    while let Some(enty) = entries.try_next().await? {
+        let alias_name = enty.file_name().into_string().unwrap_or_default();
         aliases.push(alias_name);
     }
 
@@ -343,13 +346,13 @@ pub fn list_aliases() -> Result<Vec<String>, Box<dyn Error + Send + Sync>> {
 /// - `version_filter`: Optional filter for the version string (e.g. "1.21.1" for exact match
 ///   or "1.21.*" for wildcard matching). If the provided filter does not start with "go", it will be prefixed.
 /// - `stable_only`: When `true`, only releases with stable version strings are returned.
-pub fn list_cached_versions<P: AsRef<Path>>(
+pub async fn list_cached_versions<P: AsRef<Path>>(
     cache_file: P,
     version_filter: Option<String>,
     stable_only: bool,
 ) -> Result<Vec<FilteredRelease>, Box<dyn Error + Send + Sync>> {
     // Read and deserialize the cached JSON file.
-    let data = fs::read_to_string(cache_file)?;
+    let data = async_fs::read_to_string(&cache_file).await?;
     let mut releases: Vec<FilteredRelease> = serde_json::from_str(&data)?;
 
     // Ensure the version filter (if provided) starts with "go".
@@ -403,16 +406,16 @@ pub fn list_cached_versions<P: AsRef<Path>>(
 /// # Platform-specific behavior
 ///
 /// The actual removal of the symlink is only performed on Unix-like systems.
-pub fn remove_existing_symlink<P: AsRef<Path>>(link: P) -> io::Result<()> {
+pub async fn remove_existing_symlink<P: AsRef<Path>>(link: P) -> io::Result<()> {
     let link = link.as_ref();
     if link.exists() {
         // Use symlink_metadata to avoid following the symlink.
-        let metadata = fs::symlink_metadata(link)?;
+        let metadata = async_fs::symlink_metadata(link).await?;
         if metadata.file_type().is_symlink() {
             info!("Removing existing symlink: {}", link.display());
             #[cfg(unix)]
             {
-                fs::remove_file(link)?;
+                async_fs::remove_file(link).await?;
             }
         }
     }
@@ -438,11 +441,14 @@ pub fn remove_existing_symlink<P: AsRef<Path>>(link: P) -> io::Result<()> {
 /// # Platform-specific behavior
 ///
 /// This function is only available on Unix-like systems. On other platforms, it will not be compiled.
-pub fn create_symlink<P: AsRef<Path>, Q: AsRef<Path>>(original: P, link: Q) -> io::Result<()> {
+pub async fn create_symlink<P: AsRef<Path>, Q: AsRef<Path>>(
+    original: P,
+    link: Q,
+) -> io::Result<()> {
     let link = link.as_ref();
     let original = original.as_ref();
     // Remove an existing symlink, if any.
-    match remove_existing_symlink(link) {
+    match remove_existing_symlink(link).await {
         Ok(()) => success!("Removed existing symlink: {}", link.display()),
         Err(e) => error!("Error removing existing symlink: {}", e),
     }
@@ -481,10 +487,9 @@ pub fn create_symlink<P: AsRef<Path>, Q: AsRef<Path>>(original: P, link: Q) -> i
 /// * The specified version is not found in the GVM system.
 /// * There are issues writing to the active file.
 /// * There are problems creating the default alias symlink.
-pub fn activate_version(version: String) -> Result<(), Box<dyn Error + Send + Sync>> {
+pub async fn activate_version(version: String) -> Result<(), Box<dyn Error + Send + Sync>> {
     let real_version = get_real_version(version);
-    let version_dir = get_version_file_path();
-    let version_path = Path::new(&version_dir);
+    let version_path = get_version_file_path();
     let release_dir = version_path.join(&real_version);
 
     if !release_dir.is_dir() {
@@ -495,18 +500,17 @@ pub fn activate_version(version: String) -> Result<(), Box<dyn Error + Send + Sy
     }
 
     info!("Activating version '{}' ...", real_version);
-    let active_file = format!("{}/active", version_dir);
-    let active_path = Path::new(&active_file);
+    let active_path = version_path.join("active");
 
-    match fs::write(active_path, &real_version) {
+    match async_fs::write(active_path, &real_version).await {
         Ok(_) => info!("Version '{}' activated.", real_version),
         Err(e) => error!("Error writing to active file: {}", e),
     }
 
     info!("Create default alias for version '{}' ...", real_version);
-    let alias_dir = get_alias_file_path();
-    let alias_file_path = format!("{}/default", alias_dir);
-    match create_symlink(&release_dir, alias_file_path) {
+    let alias_path = get_alias_file_path();
+    let alias_file_path = alias_path.join("default");
+    match create_symlink(&release_dir, alias_file_path).await {
         Ok(()) => success!("Default alias for version '{}' created.", real_version),
         Err(e) => error!(
             "Error creating default alias for version '{}': {}",
@@ -516,10 +520,10 @@ pub fn activate_version(version: String) -> Result<(), Box<dyn Error + Send + Sy
 
     info!("Create build cache for version '{}' ...", real_version);
     let cache_dir = get_cache_dir();
-    let version_build_cache_dir = format!("{}/{}/go-build", cache_dir, real_version);
-    match fs::create_dir_all(&version_build_cache_dir) {
+    let version_build_cache_dir = cache_dir.join(&real_version).join("go-build");
+    match async_fs::create_dir_all(&version_build_cache_dir).await {
         Ok(_) => success!("Build cache for version '{}' created.", real_version),
-        Err(ref e) if e.kind() == ErrorKind::AlreadyExists => {
+        Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => {
             info!("Build cache for version '{}' already exists.", real_version)
         }
         Err(e) => error!(
@@ -529,11 +533,11 @@ pub fn activate_version(version: String) -> Result<(), Box<dyn Error + Send + Sy
     }
 
     info!("Create go package path for version '{}' ...", real_version);
-    let package_dir = get_package_file_path();
-    let version_package_path = format!("{}/{}/bin", package_dir, real_version);
-    match fs::create_dir_all(&version_package_path) {
+    let package_path = get_package_file_path();
+    let version_package_path = package_path.join(&real_version).join("bin");
+    match async_fs::create_dir_all(&version_package_path).await {
         Ok(_) => success!("Go package path for version '{}' created.", real_version),
-        Err(ref e) if e.kind() == ErrorKind::AlreadyExists => {
+        Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => {
             info!(
                 "Go package path for version '{}' already exists.",
                 real_version
@@ -545,7 +549,7 @@ pub fn activate_version(version: String) -> Result<(), Box<dyn Error + Send + Sy
         ),
     }
 
-    init_go_environment(Some(real_version.clone()))?;
+    init_go_environment(Some(real_version.clone())).await?;
 
     success!(
         "Go version '{}' activated successfully. Please reload profile.",
@@ -576,10 +580,10 @@ pub fn activate_version(version: String) -> Result<(), Box<dyn Error + Send + Sy
 /// This function will return an error if:
 /// * No version is provided (i.e., `version` is `None`).
 /// * There are issues setting environment variables or reading the current PATH.
-pub fn init_go_environment(version: Option<String>) -> Res<()> {
+pub async fn init_go_environment(version: Option<String>) -> Res<()> {
     let active_version = match version {
         Some(v) => v,
-        None => match get_active_version() {
+        None => match get_active_version().await {
             Some(v) => v,
             None => error!("No active version found. Use 'gvm list' to see available versions."),
         },
@@ -591,38 +595,46 @@ pub fn init_go_environment(version: Option<String>) -> Res<()> {
     );
 
     info!("Prepare environment for version {} ...", &active_version);
-    let environment_dir = get_environment_file_path();
-    let environment_path = Path::new(&environment_dir);
-    match fs::create_dir_all(&environment_path) {
+    let environment_path = get_environment_file_path();
+    match async_fs::create_dir_all(&environment_path).await {
         Ok(_) => success!("Environment directory created."),
-        Err(ref e) if e.kind() == ErrorKind::AlreadyExists => {
+        Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => {
             info!("Environment directory already exists.")
         }
         Err(e) => error!("Error creating environment directory: {}", e),
     }
 
     let environment_file_path = environment_path.join("go.env");
-    let mut environment_file = File::create(&environment_file_path)?;
+    let version_path = get_version_file_path();
+    let cache_dir = get_cache_dir();
+    let package_path = get_package_file_path();
 
-    let env_vars = [
-        (
-            "GOROOT",
-            format!("{}/{}", get_version_file_path(), &active_version),
-        ),
-        (
-            "GOCACHE",
-            format!("{}/{}/go-build", get_cache_dir(), &active_version),
-        ),
-        (
-            "GOPATH",
-            format!("{}/{}", get_package_file_path(), &active_version),
-        ),
-        ("GOENV", environment_file_path.display().to_string()),
+    let goroot = version_path.join(&active_version);
+    let gocache = cache_dir.join(&active_version).join("go-build");
+    let gopath = package_path.join(&active_version);
+
+    let env_vars = vec![
+        ("GOROOT", goroot.to_string_lossy()),
+        ("GOCACHE", gocache.to_string_lossy()),
+        ("GOPATH", gopath.to_string_lossy()),
+        ("GOENV", environment_file_path.to_string_lossy()),
     ];
 
+    let mut env_content = String::new();
+
     for (env_key, env_value) in env_vars {
-        writeln!(environment_file, "{}={}", env_key, env_value)?;
+        if env_value.contains(' ') || env_value.contains('"') || env_value.contains('\'') {
+            env_content.push_str(&format!(
+                "{}=\"{}\"\n",
+                env_key,
+                env_value.replace('"', "\\\"")
+            ));
+        } else {
+            env_content.push_str(&format!("{}={}\n", env_key, env_value));
+        }
     }
+
+    async_fs::write(&environment_file_path, env_content).await?;
 
     success!("Go environment prepared for version '{}'.", &active_version);
 
@@ -640,12 +652,12 @@ pub fn init_go_environment(version: Option<String>) -> Res<()> {
 ///   if a valid version is found and it starts with "go".
 /// - `None`: If no active version is set, the file can't be read,
 ///   or the content doesn't represent a valid Go version (i.e., doesn't start with "go").
-pub fn get_active_version() -> Option<String> {
-    let version_dir = get_version_file_path();
-    let version_path = Path::new(&version_dir);
+pub async fn get_active_version() -> Option<String> {
+    let version_path = get_version_file_path();
     let active_path = version_path.join("active");
 
-    fs::read_to_string(active_path)
+    async_fs::read_to_string(active_path)
+        .await
         .ok()
         .and_then(|active_version| {
             if active_version.starts_with("go") {
@@ -670,7 +682,10 @@ pub fn get_active_version() -> Option<String> {
 ///
 /// * `true` if the provided version matches the currently active version.
 /// * `false` if the versions don't match or if there is no active version set.
-pub fn is_version_active(version: &str) -> bool {
+pub async fn is_version_active(version: &str) -> bool {
     let active_version = get_active_version();
-    active_version.map(|av| av == version).unwrap_or(false)
+    active_version
+        .await
+        .map(|av| av == version)
+        .unwrap_or(false)
 }

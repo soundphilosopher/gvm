@@ -1,4 +1,4 @@
-use crate::{error, info, success, util, Res};
+use crate::{error, info, success, utils, Res};
 
 /// Removes a specified alias from the system.
 ///
@@ -18,17 +18,17 @@ pub async fn remove_alias(alias: String) -> Res<()> {
         error!("Removing 'default' as alias is not allowed. Please choose a different alias.");
     }
 
-    let available_aliases = util::list_aliases()?;
+    let available_aliases = utils::list_aliases().await?;
     if !available_aliases.contains(&alias) {
         info!("Alias {} does not exist. Nothing to remove.", alias);
         return Ok(());
     }
 
     info!("Removing alias {}...", alias);
-    let alias_dir = util::get_alias_file_path();
-    let alias_path = format!("{}/{}", alias_dir, alias);
+    let alias_dir = utils::get_alias_file_path();
+    let alias_path = alias_dir.join(&alias);
 
-    util::remove_existing_symlink(alias_path)?;
+    utils::remove_existing_symlink(alias_path).await?;
     success!("Alias {} removed.", alias);
 
     Ok(())

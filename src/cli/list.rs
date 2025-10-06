@@ -1,4 +1,4 @@
-use crate::{util, Res};
+use crate::{utils, Res};
 
 /// Lists installed Go versions, optionally filtered by version and stability.
 ///
@@ -16,7 +16,7 @@ use crate::{util, Res};
 ///
 /// Returns `Res<()>`, which is `Ok(())` if the operation succeeds, or an error if it fails.
 pub async fn list(version: Option<String>, stable: bool) -> Res<()> {
-    let mut releases: Vec<String> = util::list_installed_versions()?;
+    let mut releases: Vec<String> = utils::list_installed_versions().await?;
 
     let version_filter = version.map(|f| {
         if f.starts_with("go") {
@@ -27,7 +27,7 @@ pub async fn list(version: Option<String>, stable: bool) -> Res<()> {
     });
 
     releases.retain(|r: &String| {
-        if stable && !util::is_stable_version(&r) {
+        if stable && !utils::is_stable_version(&r) {
             return false;
         }
         if let Some(ref filter) = version_filter {
@@ -42,10 +42,10 @@ pub async fn list(version: Option<String>, stable: bool) -> Res<()> {
         }
     });
 
-    releases.sort_by(|a, b| util::cmp_versions(&a, &b));
+    releases.sort_by(|a, b| utils::cmp_versions(&a, &b));
 
     for release in releases {
-        if util::is_version_active(&release) {
+        if utils::is_version_active(&release).await {
             use colored::Colorize;
             println!("{} {}", release.green().bold(), "*".yellow());
         } else {

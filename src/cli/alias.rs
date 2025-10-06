@@ -1,6 +1,4 @@
-use std::fs;
-
-use crate::{error, info, success, util, Res};
+use crate::{error, info, success, utils, Res};
 
 /// Creates an alias for a specific Go version or lists existing aliases.
 ///
@@ -27,12 +25,12 @@ pub async fn alias(alias: String, target: Option<String>) -> Res<()> {
     if alias == "list" || alias == "ls" {
         use colored::Colorize;
 
-        let alias_list = util::list_aliases()?;
+        let alias_list = utils::list_aliases().await?;
         let alias_max_length = alias_list.iter().map(|name| name.len()).max().unwrap_or(0);
         for alias_name in alias_list {
-            let alias_dir = util::get_alias_file_path();
-            let alias_path = format!("{}/{}", alias_dir, alias_name);
-            let release_path = fs::read_link(alias_path)?;
+            let alias_dir = utils::get_alias_file_path();
+            let alias_path = alias_dir.join(&alias_name);
+            let release_path = async_fs::read_link(&alias_path).await?;
             println!(
                 "{:<width$} ~> {}",
                 if alias_name == "default" {
@@ -52,7 +50,7 @@ pub async fn alias(alias: String, target: Option<String>) -> Res<()> {
         return Ok(());
     }
 
-    let existing_aliases = util::list_aliases()?;
+    let existing_aliases = utils::list_aliases().await?;
     if existing_aliases.contains(&alias) {
         error!(
             "Alias {} already exists. Please choose a different alias.",
@@ -60,8 +58,8 @@ pub async fn alias(alias: String, target: Option<String>) -> Res<()> {
         );
     }
 
-    let release_version = util::get_real_version(target.unwrap_or_default());
-    let releases = util::list_installed_versions()?;
+    let release_version = utils::get_real_version(target.unwrap_or_default());
+    let releases = utils::list_installed_versions().await?;
     if !releases.contains(&release_version) {
         error!(
             "Version {} is not installed. Please install it first.",
@@ -73,12 +71,12 @@ pub async fn alias(alias: String, target: Option<String>) -> Res<()> {
         "Creating alias {} for version {}...",
         alias, release_version
     );
-    let release_dir = util::get_version_file_path();
-    let release_path = format!("{}/{}", release_dir, release_version);
-    let alias_dir = util::get_alias_file_path();
-    let alias_file_path = format!("{}/{}", alias_dir, alias);
+    let release_dir = utils::get_version_file_path();
+    let release_path = release_dir.join(&release_version);
+    let alias_dir = utils::get_alias_file_path();
+    let alias_file_path = alias_dir.join(&alias);
 
-    util::create_symlink(release_path, alias_file_path)?;
+    utils::create_symlink(release_path, alias_file_path).await?;
     success!("Alias {} created for version {}.", alias, release_version);
     Ok(())
 }

@@ -1,10 +1,10 @@
-use crate::{error, success, util, Res};
+use crate::{error, success, utils, Res};
 
 pub async fn use_version(version: String) -> Res<()> {
-    let real_verison = util::get_real_version(version);
+    let real_verison = utils::get_real_version(version);
 
     // get installed versions
-    let installed_versions: Vec<String> = util::list_installed_versions()?;
+    let installed_versions: Vec<String> = utils::list_installed_versions().await?;
 
     // check if version is already installed
     if !installed_versions.contains(&real_verison) {
@@ -15,11 +15,11 @@ pub async fn use_version(version: String) -> Res<()> {
     }
 
     // check if version is already active
-    if util::is_version_active(&real_verison) {
+    if utils::is_version_active(&real_verison).await {
         success!("Version {} is already active.", real_verison);
         return Ok(());
     }
 
     // activate version
-    return util::activate_version(real_verison);
+    utils::activate_version(real_verison).await
 }

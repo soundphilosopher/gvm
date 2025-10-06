@@ -1,6 +1,6 @@
 use crate::{
     error, info, success,
-    util::{self, activate_version, get_real_version},
+    utils::{self, activate_version, get_real_version},
     Res,
 };
 use flate2::read::GzDecoder;
@@ -25,9 +25,9 @@ use tar::Archive;
 ///
 /// * `bool` - Returns `true` if the version is already installed, `false` otherwise.
 fn version_already_installed(version: String) -> bool {
-    let install_path = util::get_version_file_path();
-    let version_path = Path::new(&install_path).join(version);
-    return version_path.exists();
+    let install_path = utils::get_version_file_path();
+    let version_path = install_path.join(&version);
+    version_path.exists()
 }
 
 /// Downloads a release package from the specified URL and saves it to a temporary file.
@@ -63,11 +63,11 @@ async fn download_release(url: String) -> Result<PathBuf, Box<dyn Error + Send +
         .split("/")
         .last()
         .ok_or("Invalid package URL; cannot extract package name.")?;
-    let archive_path = util::get_archive_file_path();
-    let archive_file = Path::new(&archive_path).join(package_name);
+    let archive_path = utils::get_archive_file_path();
+    let archive_file = archive_path.join(&package_name);
 
     info!("Create temporary archive file: {}", archive_file.display());
-    match fs::write(&archive_file, &content) {
+    match async_fs::write(&archive_file, &content).await {
         Ok(_) => info!("Temporary archive file created: {}", archive_file.display()),
         Err(err) => error!("Failed to create temporary archive file: {}", err),
     }
@@ -90,16 +90,16 @@ async fn download_release(url: String) -> Result<PathBuf, Box<dyn Error + Send +
 ///
 /// * `Res<()>` - A Result type. Returns `Ok(())` if the extraction and setup process is successful,
 ///   or an error if any step fails.
-fn extract_package(archive_file: PathBuf, release: util::FilteredRelease) -> Res<()> {
+fn extract_package(archive_file: PathBuf, release: utils::FilteredRelease) -> Res<()> {
     // get install path
-    let install_path = util::get_version_file_path();
+    let install_path = utils::get_version_file_path();
 
     // extract package to installation directory
     let package_file = fs::File::open(&archive_file)?;
     let decompressor = GzDecoder::new(package_file);
     let mut package_archive = Archive::new(decompressor);
 
-    info!("Extracting package to: {}", install_path);
+    info!("Extracting package to: {}", install_path.display());
     match package_archive.unpack(&install_path) {
         Ok(_) => success!("Package extracted successfully."),
         Err(e) => error!("Error: Failed to extract package: {}", e),
@@ -126,14 +126,14 @@ fn extract_package(archive_file: PathBuf, release: util::FilteredRelease) -> Res
 }
 
 pub async fn install(version: String, use_version: bool) -> Res<()> {
-    let cache_dir: String = util::get_cache_dir();
-    let cache_file = format!("{}/releases.json", cache_dir);
-    let data = fs::read_to_string(cache_file)?;
-    let available_versions: Vec<util::FilteredRelease> = serde_json::from_str(&data)?;
+    let mut cache_dir: PathBuf = utils::get_cache_dir();
+    cache_dir.push("release.json");
+    let data = async_fs::read_to_string(&cache_dir).await?;
+    let available_versions: Vec<utils::FilteredRelease> = serde_json::from_str(&data)?;
 
     let version_filter = get_real_version(version);
 
-    let releases: Vec<util::FilteredRelease> = available_versions
+    let releases: Vec<utils::FilteredRelease> = available_versions
         .into_iter()
         .filter(|release| release.version == version_filter)
         .collect();
@@ -162,7 +162,7 @@ pub async fn install(version: String, use_version: bool) -> Res<()> {
     }
 
     if use_version {
-        return activate_version(release.version.clone());
+        return activate_version(release.version.clone()).await;
     }
 
     Ok(())

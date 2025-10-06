@@ -1,4 +1,6 @@
-use crate::{util, Res};
+use std::path::PathBuf;
+
+use crate::{utils, Res};
 
 /// Lists remote Go versions based on the cached releases.
 ///
@@ -20,12 +22,12 @@ use crate::{util, Res};
 /// Returns `Res<()>`, which is `Ok(())` if the operation succeeds, or
 /// an error if there's a problem reading the cache or processing the data.
 pub async fn list_remote(version: Option<String>, stable: bool) -> Res<()> {
-    let cache_dir: String = util::get_cache_dir();
-    let cache_file = format!("{}/releases.json", cache_dir);
+    let mut cache_file: PathBuf = utils::get_cache_dir();
+    cache_file.push("releases.json");
 
-    let releases: Vec<util::FilteredRelease> =
-        util::list_cached_versions(cache_file, version, stable)?;
-    let installed_releases: Vec<String> = util::list_installed_versions()?;
+    let releases: Vec<utils::FilteredRelease> =
+        utils::list_cached_versions(cache_file, version, stable).await?;
+    let installed_releases: Vec<String> = utils::list_installed_versions().await?;
 
     for release in releases {
         if installed_releases.contains(&release.version) {
