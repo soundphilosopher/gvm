@@ -198,7 +198,7 @@ Found a bug? Have a cool feature idea? We'd love your help!
 
 ## 📄 License
 
-This project is licensed under UNLICENSED - see the [LICENSE](LICENSE) file for details.
+This project is licensed under MIT - see the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
