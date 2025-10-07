@@ -49,7 +49,16 @@ gvm list-remote --stable
 ```bash
 git clone https://github.com/yourusername/gvm.git
 cd gvm
+
+# get help
+./install-nix.sh --help
+# initialize GVM
 ./install-nix.sh
+# Initialize GVM and install latest stable Go version
+./install-nix.sh --install-latest
+
+# Reload shell profile
+source ~/.profile
 ```
 
 This script will:
@@ -57,8 +66,7 @@ This script will:
 1. 🔧 Build and install GVM using Cargo
 2. 🎯 Initialize the Go environment
 3. 📡 Update the version cache
-4. 🏆 Install the latest stable Go version
-5. 🔄 Reload your profile
+4. 🏆 Install the latest stable Go version (via option `--install-latest`)
 
 ### Manual Installation
 
