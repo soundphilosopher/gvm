@@ -1,5 +1,5 @@
 use crate::{
-    error, info, success,
+    config, error, info, success,
     utils::{self, activate_version, get_real_version},
     Res,
 };
@@ -127,7 +127,7 @@ fn extract_package(archive_file: PathBuf, release: utils::FilteredRelease) -> Re
 
 pub async fn install(version: String, use_version: bool) -> Res<()> {
     let mut cache_dir: PathBuf = utils::get_cache_dir();
-    cache_dir.push("release.json");
+    cache_dir.push(config::RELEASE_CACHE_FILE);
     let data = async_fs::read_to_string(&cache_dir).await?;
     let available_versions: Vec<utils::FilteredRelease> = serde_json::from_str(&data)?;
 
