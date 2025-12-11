@@ -12,7 +12,7 @@ use std::{
 #[cfg(unix)]
 use std::os::unix::fs as unix_fs;
 
-use crate::{error, info, success, Res};
+use crate::{config, error, info, success, Res};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FilteredRelease {
@@ -171,7 +171,7 @@ pub fn get_shell_config_file_path() -> Result<PathBuf, String> {
 /// - `/tmp/gvm` as a fallback if the home directory cannot be determined
 pub fn get_gvm_base_file_path() -> PathBuf {
     let home = get_home_dir();
-    home.join(".gvm")
+    home.join(config::GVM_MAIN_PATH)
 }
 
 /// Returns the path to the cache directory for the GVM (Go Version Manager) system.
@@ -188,7 +188,7 @@ pub fn get_gvm_base_file_path() -> PathBuf {
 /// - `/tmp/gvm/cache` as a fallback if the home directory cannot be determined
 pub fn get_cache_dir() -> PathBuf {
     let gvm_path = get_gvm_base_file_path();
-    gvm_path.join("cache")
+    gvm_path.join(config::GVM_CACHE_PATH)
 }
 
 /// Returns the file path for the environment configuration used by GVM (Go Version Manager).
@@ -204,7 +204,7 @@ pub fn get_cache_dir() -> PathBuf {
 /// - `/tmp/gvm/environment` as a fallback if the home directory cannot be determined
 pub fn get_environment_file_path() -> PathBuf {
     let gvm_path = get_gvm_base_file_path();
-    gvm_path.join("environment")
+    gvm_path.join(config::GVM_ENVIRONMENT_PATH)
 }
 
 /// Returns the file path for the version configuration.
@@ -220,7 +220,7 @@ pub fn get_environment_file_path() -> PathBuf {
 /// - `/tmp/gvm/version` as a fallback if the home directory cannot be determined
 pub fn get_version_file_path() -> PathBuf {
     let gvm_path = get_gvm_base_file_path();
-    gvm_path.join("version")
+    gvm_path.join(config::GVM_VERSION_PATH)
 }
 
 /// Returns the file path for the package configuration.
@@ -236,7 +236,7 @@ pub fn get_version_file_path() -> PathBuf {
 /// - `/tmp/gvm/package` as a fallback if the home directory cannot be determined
 pub fn get_package_file_path() -> PathBuf {
     let gvm_path = get_gvm_base_file_path();
-    gvm_path.join("package")
+    gvm_path.join(config::GVM_PACKAGE_PATH)
 }
 
 /// Returns the file path for the archive configuration.
@@ -252,7 +252,7 @@ pub fn get_package_file_path() -> PathBuf {
 /// - `/tmp/gvm/archive` as a fallback if the home directory cannot be determined
 pub fn get_archive_file_path() -> PathBuf {
     let gvm_path = get_gvm_base_file_path();
-    gvm_path.join("archive")
+    gvm_path.join(config::GVM_ARCHIVE_PATH)
 }
 
 /// Returns the file path for the alias configuration.
@@ -268,7 +268,7 @@ pub fn get_archive_file_path() -> PathBuf {
 /// - `/tmp/gvm/alias` as a fallback if the home directory cannot be determined
 pub fn get_alias_file_path() -> PathBuf {
     let gvm_path = get_gvm_base_file_path();
-    gvm_path.join("alias")
+    gvm_path.join(config::GVM_ALIAS_PATH)
 }
 
 /// Lists all installed Go versions managed by GVM.

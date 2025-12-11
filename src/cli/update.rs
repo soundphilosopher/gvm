@@ -5,7 +5,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{info, success, utils, Res};
+use crate::{config, info, success, utils, Res};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Release {
@@ -121,7 +121,7 @@ async fn create_release_cache<P: AsRef<Path>>(cache_file: P) -> Res<()> {
 /// - Creating the release cache fails
 pub async fn update() -> Res<()> {
     let mut cache_dir: PathBuf = utils::get_cache_dir();
-    cache_dir.push("release.json");
+    cache_dir.push(config::RELEASE_CACHE_FILE);
 
     Ok(create_release_cache(cache_dir).await?)
 }
